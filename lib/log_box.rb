@@ -1,19 +1,27 @@
-require "fluent-logger"
 require "log_box/version"
+require "fluent-logger"
+require "pp"
 
 module LogBox
-  def self.log(obj, tag = :thread)
+  DEFAULT_TAG = :thread
+
+  def self.log(obj, options = {})
+    o = { tag: DEFAULT_TAG, time: Time.now, log: obj }.merge(options)
+    tag = o.delete :tag
     init_log_box_tag_if_not tag
-    log_box_location[tag] << { time: Time.now, log: obj }
+    log_box_location[tag] << o
   end
 
-  def self.flush(tag = :thread)
-    result = {}.tap { |hash|
-      hash[:tag] = tag
-      hash[:logs] = log_box_location[tag]
-    }
-    flush_to_fluentd result
-    init_log_box_tag tag
+  def self.flush(options = {})
+    o = { tag: DEFAULT_TAG }.merge(options)
+    tag = o.delete :tag
+    o[:logs] = log_box_location[tag]
+    flush_to_fluentd o
+    delete_log_box_tag tag
+  end
+
+  def self.display
+    pp log_box_location
   end
 
   private
@@ -33,6 +41,10 @@ module LogBox
   def self.init_log_box_tag_if_not(tag = :thread)
     init_log_box_if_not
     log_box_location[tag] ||= []
+  end
+
+  def self.delete_log_box_tag(tag = :thread)
+    log_box_location.delete tag
   end
 
   def self.init_log_box_tag(tag = :thread)
