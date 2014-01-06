@@ -24,7 +24,13 @@ describe LogBox do
   let(:message_1_) { 'hello 1' }
   let(:message_2_) { 'hello 2' }
 
+  class DummyLogger
+    def initialize(); end
+    def post(tag, result); end
+  end
+
   before do
+    LogBox.configure do |config| config.logger = DummyLogger.new end
     LogBox.send(:init_log_box)
     LogBox.stub(:current_time).and_return(current_time_)
   end

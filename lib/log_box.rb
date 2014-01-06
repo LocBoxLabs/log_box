@@ -22,12 +22,14 @@ module LogBox
     yield(configuration)
   end
 
+  DEFAULT_TAG = :thread
+
   class Configuration
-    attr_accessor :logger
+    attr_accessor :logger, :default_tag
 
     def initialize
       @logger = Fluent::Logger::ConsoleLogger.new(STDOUT)
-      @default_tag = :thread
+      @default_tag = DEFAULT_TAG
     end
   end
 
@@ -41,13 +43,15 @@ module LogBox
   #    {:time=>2014-01-01 15:38:23 -0800, :log=>"Hello2"}]
   # }
   def self.log(obj, options = {})
-    o = { tag: self.configuration.default_tag,
+    return unless logger
+
+    o = { tag: default_tag,
       time: current_time,
       log: obj.is_a?(String) ? obj : obj.inspect
     }.merge(options).symbolize_keys
 
 =begin
-    o = { tag: self.configuration.default_tag, time: current_time }.merge(options).symbolize_keys
+    o = { tag: default_tag, time: current_time }.merge(options).symbolize_keys
     if obj.is_a?(String)
       o[:log] = obj
     elsif obj.class < ActiveRecord::Base
@@ -76,7 +80,9 @@ module LogBox
   #     "time" : ISODate("2014-01-01T23:17:01.000Z")
   # }
   def self.flush(options = {})
-    o = { tag: self.configuration.default_tag }.merge(options).symbolize_keys
+    return unless logger
+
+    o = { tag: default_tag }.merge(options).symbolize_keys
     tag = o[:tag]
     o[:logs] = log_box[tag]
     flush_to_fluentd o
@@ -84,7 +90,9 @@ module LogBox
   end
 
   def self.discard(tag = nil)
-    tag ||= self.configuration.default_tag
+    return unless logger
+
+    tag ||= default_tag
     log_box.delete tag
   end
 
@@ -99,6 +107,14 @@ module LogBox
 
   private
 
+  def self.default_tag
+    self.configuration.default_tag || :thread
+  end
+
+  def self.logger
+    self.configuration.logger
+  end
+
   def self.current_time
     Time.now
   end
@@ -112,17 +128,17 @@ module LogBox
   end
 
   def self.init_log_box_tag_if_not(tag = nil)
-    tag ||= self.configuration.default_tag
+    tag ||= default_tag
     init_log_box_if_not
     log_box[tag] ||= []
   end
 
   def self.init_log_box_tag(tag = nil)
-    tag ||= self.configuration.default_tag
+    tag ||= default_tag
     log_box[tag] = []
   end
 
   def self.flush_to_fluentd(result)
-    self.configuration.logger.post 'log_box', result
+    logger.post 'log_box', result if logger
   end
 end
