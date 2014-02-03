@@ -22,14 +22,18 @@ module LogBox
     yield(configuration)
   end
 
+  DEFAULT_LABEL = :log_box
   DEFAULT_TAG = :thread
+  DEFAULT_RECORD_THREAD_ID = true
 
   class Configuration
-    attr_accessor :logger, :default_tag
+    attr_accessor :logger, :default_label, :default_tag, :record_thread_id
 
     def initialize
       @logger = Fluent::Logger::ConsoleLogger.new(STDOUT)
+      @default_label = DEFAULT_LABEL
       @default_tag = DEFAULT_TAG
+      @record_thread_id = DEFAULT_RECORD_THREAD_ID
     end
   end
 
@@ -49,7 +53,6 @@ module LogBox
       time: current_time,
       log: obj.is_a?(String) ? obj : obj.inspect
     }.merge(options).symbolize_keys
-
 =begin
     o = { tag: default_tag, time: current_time }.merge(options).symbolize_keys
     if obj.is_a?(String)
@@ -65,6 +68,8 @@ module LogBox
     tag = o.delete :tag
     init_log_box_tag_if_not tag
     log_box[tag] << o
+    puts "---------- stored in LogBox"
+    pp o
   end
 
   # Following log is stored into fluentd:
@@ -81,10 +86,13 @@ module LogBox
   # }
   def self.flush(options = {})
     return unless logger
+    init_log_box_if_not
 
     o = { tag: default_tag }.merge(options).symbolize_keys
     tag = o[:tag]
     o[:logs] = log_box[tag]
+    record_thread_id(o)
+    record_runtime(o, tag)
     flush_to_fluentd o
     discard tag
   end
@@ -104,11 +112,26 @@ module LogBox
     Thread.current[:_log_box]
   end
 
+  def self.set_defautl_tag_on_this_thread(tag)
+    Thread.current[:_log_box_default_tag] = tag
+  end
+
+  def self.unset_defautl_tag_on_this_thread
+    set_defautl_tag_on_this_thread nil
+  end
 
   private
 
+  def self.default_label
+    self.configuration.default_label || DEFAULT_LABEL
+  end
+
   def self.default_tag
-    self.configuration.default_tag || :thread
+    Thread.current[:_log_box_default_tag] || self.configuration.default_tag || DEFAULT_TAG
+  end
+
+  def self.default_record_thread_id
+    self.configuration.record_thread_id || DEFAULT_RECORD_THREAD_ID
   end
 
   def self.logger
@@ -117,6 +140,30 @@ module LogBox
 
   def self.current_time
     Time.now
+  end
+
+  def self.thread_id
+    Thread.current.object_id
+  end
+
+  def self.process_id
+    Process.pid
+  end
+
+  def self.record_thread_id(o)
+    if self.configuration.record_thread_id
+      o[:thread_id] = thread_id
+      o[:process_id] = process_id
+    end
+  end
+
+  def self.start_at(tag)
+    return nil unless log_box[tag] && log_box[tag][0]
+    log_box[tag][0].try(:[], :time)
+  end
+
+  def self.record_runtime(o, tag)
+    o[:runtime] = Time.now - start_at(tag) if (start_at(tag) && o[:runtime].nil?)
   end
 
   def self.init_log_box
@@ -139,6 +186,6 @@ module LogBox
   end
 
   def self.flush_to_fluentd(result)
-    logger.post 'log_box', result if logger
+    logger.post default_label, result if logger
   end
 end
