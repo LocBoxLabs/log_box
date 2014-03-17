@@ -94,6 +94,8 @@ module LogBox
     o[:logs] = log_box[tag]
     record_thread_id(o)
     record_runtime(o, tag)
+    record_start_at(o, tag)
+    record_finish_at(o, tag)
     flush_to_fluentd o
     discard tag
   end
@@ -143,7 +145,8 @@ module LogBox
   end
 
   def self.current_time
-    Time.now
+    # unit: milli second
+    Time.now.instance_eval { self.to_i * 1000 + (usec/1000) }
   end
 
   def self.thread_id
@@ -166,8 +169,16 @@ module LogBox
     log_box[tag][0].try(:[], :time)
   end
 
+  def self.record_start_at(o, tag)
+    o[:start_at] = start_at(tag)
+  end
+
+  def self.record_finish_at(o, tag)
+    o[:finish_at] = current_time
+  end
+
   def self.record_runtime(o, tag)
-    o[:runtime] = Time.now - start_at(tag) if (start_at(tag) && o[:runtime].nil?)
+    o[:runtime] = (current_time - start_at(tag)) / 1000.0 if (start_at(tag) && o[:runtime].nil?)
   end
 
   def self.init_log_box
