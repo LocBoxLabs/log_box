@@ -49,11 +49,12 @@ module LogBox
   def self.log(obj, options = {})
     return unless logger
 
+=begin
     o = { tag: default_tag,
       time: current_time,
       log: obj.is_a?(String) ? obj : obj.inspect
     }.merge(options).symbolize_keys
-=begin
+=end
     o = { tag: default_tag, time: current_time }.merge(options).symbolize_keys
     if obj.is_a?(String)
       o[:log] = obj
@@ -64,7 +65,7 @@ module LogBox
     else
       o[:log] = obj.inspect
     end
-=end
+
     tag = o.delete :tag
     init_log_box_tag_if_not tag
     log_box[tag] << o
@@ -113,11 +114,13 @@ module LogBox
   end
 
   def self.set_defautl_tag_on_this_thread(tag)
-    Thread.current[:_log_box_default_tag] = tag
+    Thread.current[:_log_box_default_tag] ||= []
+    Thread.current[:_log_box_default_tag].push tag
   end
 
   def self.unset_defautl_tag_on_this_thread
-    set_defautl_tag_on_this_thread nil
+    return unless Thread.current[:_log_box_default_tag]
+    Thread.current[:_log_box_default_tag].pop
   end
 
   private
@@ -127,7 +130,8 @@ module LogBox
   end
 
   def self.default_tag
-    Thread.current[:_log_box_default_tag] || self.configuration.default_tag || DEFAULT_TAG
+    Thread.current[:_log_box_default_tag].try(:[], -1) || self.configuration.default_tag ||
+      DEFAULT_TAG
   end
 
   def self.default_record_thread_id
