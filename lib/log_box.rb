@@ -63,7 +63,8 @@ module LogBox
     elsif obj.is_a?(Hash)
       o.merge!(obj)
     else
-      o[:log] = obj.inspect
+      # o[:log] = obj.inspect
+      o[:log] = obj.to_json
     end
 
     tag = o.delete :tag
