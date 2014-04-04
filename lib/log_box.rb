@@ -74,6 +74,14 @@ module LogBox
     pp o
   end
 
+  def self.add_attribute(key, value, options = {})
+    return unless logger
+    o = { tag: default_tag }.merge(options).symbolize_keys
+    tag = o[:tag]
+    init_log_box_tag_if_not tag
+    attributes[tag][key] = value
+  end
+
   # Following log is stored into fluentd:
   # {
   #     "_id" : ObjectId("52c4a1f4e1eef37b9900001a"),
@@ -97,6 +105,8 @@ module LogBox
     record_runtime(o, tag)
     record_start_at(o, tag)
     record_finish_at(o, tag)
+    binding.pry
+    o.merge!(attributes[tag]) if attributes[tag]
     flush_to_fluentd o
     discard tag
   end
@@ -106,14 +116,20 @@ module LogBox
 
     tag ||= default_tag
     log_box.delete tag
+    attributes.delete tag
   end
 
   def self.display
     pp log_box
+    pp attributes
   end
 
   def self.log_box
     Thread.current[:_log_box]
+  end
+
+  def self.attributes
+    Thread.current[:_log_box_attributes]
   end
 
   def self.set_defautl_tag_on_this_thread(tag)
@@ -184,6 +200,7 @@ module LogBox
 
   def self.init_log_box
     Thread.current[:_log_box] = {}  # key: tag, value: Array of Hash
+    Thread.current[:_log_box_attributes] ||= {}
   end
 
   def self.init_log_box_if_not
@@ -194,6 +211,7 @@ module LogBox
     tag ||= default_tag
     init_log_box_if_not
     log_box[tag] ||= []
+    attributes[tag] ||= {}
   end
 
   def self.init_log_box_tag(tag = nil)
