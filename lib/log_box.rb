@@ -105,7 +105,6 @@ module LogBox
     record_runtime(o, tag)
     record_start_at(o, tag)
     record_finish_at(o, tag)
-    binding.pry
     o.merge!(attributes[tag]) if attributes[tag]
     flush_to_fluentd o
     discard tag
