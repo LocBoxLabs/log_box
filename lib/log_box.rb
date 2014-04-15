@@ -70,8 +70,6 @@ module LogBox
     tag = o.delete :tag
     init_log_box_tag_if_not tag
     log_box[tag] << o
-    puts "---------- stored in LogBox"
-    pp o
   end
 
   def self.add_attribute(key, value, options = {})
@@ -121,6 +119,7 @@ module LogBox
   def self.display
     pp log_box
     pp attributes
+    true
   end
 
   def self.log_box
